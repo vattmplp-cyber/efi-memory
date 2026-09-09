@@ -14,13 +14,21 @@ jobs:
     - name: Add MSBuild to PATH
       uses: microsoft/setup-msbuild@v2
 
-    - name: Build Solution
-      run: msbuild efi-memory.sln /p:Configuration=Release /p:Platform=x64
+    - name: Find and Build Solution or Project
+      run: |
+        $file = Get-ChildItem -Recurse -Include *.sln, *.vcxproj | Select-Object -First 1
+        if ($file) {
+            Write-Host "Found file: $($file.FullName)"
+            msbuild $file.FullName /p:Configuration=Release /p:Platform=x64
+        } else {
+            Write-Error "No .sln or .vcxproj file found in the repository!"
+            exit 1
+        }
 
     - name: Upload Artifact
       uses: actions/upload-artifact@v4
       with:
         name: client-exe
         path: |
-          x64/Release/*.exe
-          Release/*.exe
+          **/Release/*.exe
+          **/x64/Release/*.exe
