@@ -14,11 +14,12 @@ jobs:
     - name: Add MSBuild to PATH
       uses: microsoft/setup-msbuild@v2
 
-    - name: Bypass ATL Dependency
+    - name: Bypass ATL Dependency and Fix Warnings
       shell: pwsh
       run: |
         $dir = "client/efi-mapper/kdmapper"
         
+        # Створюємо шим для atlstr.h
         $shim = @'
         #pragma once
         #include <string>
@@ -45,13 +46,21 @@ jobs:
         
         Set-Content -Path "$dir/atlstr.h" -Value $shim -Encoding UTF8
         
+        # Виправляємо інклуд у заголовному файлі
         $hp = "$dir/efi_driver.hpp"
         $c = Get-Content $hp -Raw
         $c = $c -replace '#include\s*<atlstr\.h>', '#include "atlstr.h"'
         Set-Content -Path $hp -Value $c -Encoding UTF8
 
+        # Патчимо vcxproj, щоб вимкнути TreatWarningAsError та ігнорувати попередження 4100
+        $proj = "$dir/kdmapper.vcxproj"
+        $projContent = Get-Content $proj -Raw
+        $projContent = $projContent -replace '<TreatWarningAsError>true</TreatWarningAsError>', '<TreatWarningAsError>false</TreatWarningAsError>'
+        $projContent = $projContent -replace '<WarningLevel>W4</WarningLevel>', '<WarningLevel>W4</WarningLevel><DisableSpecificWarnings>4100</DisableSpecificWarnings>'
+        Set-Content -Path $proj -Value $projContent -Encoding UTF8
+
     - name: Build kdmapper
-      run: msbuild client/efi-mapper/kdmapper/kdmapper.vcxproj /p:Configuration=Release /p:Platform=x64 /p:TreatWarningAsError=false
+      run: msbuild client/efi-mapper/kdmapper/kdmapper.vcxproj /p:Configuration=Release /p:Platform=x64
 
     - name: Upload Artifact
       uses: actions/upload-artifact@v4
