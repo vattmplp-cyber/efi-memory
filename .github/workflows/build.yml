@@ -14,16 +14,23 @@ jobs:
     - name: Add MSBuild to PATH
       uses: microsoft/setup-msbuild@v2
 
-    - name: Install ATL Component
+    - name: Fix Project Configuration for Latest Toolset
       run: |
-        $installer = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vs_installer.exe"
-        $vsPath = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" -latest -property installationPath
-        if ($installer -and $vsPath) {
-            Write-Host "Installing ATL component for VS at: $vsPath"
-            & $installer modify --installPath "$vsPath" --add Microsoft.VisualStudio.Component.VC.ATL --passive --norestart
-        } else {
-            Write-Error "Visual Studio installer not found!"
-            exit 1
+        $projFile = Get-ChildItem -Recurse -Include *.vcxproj | Select-Object -First 1
+        if ($projFile) {
+            Write-Host "Updating PlatformToolset in: $($projFile.FullName)"
+            [xml]$xml = Get-Content $projFile.FullName
+            # Змінюємо версію інструментів на поточну системну, щоб уникнути конфліктів ATL
+            foreach ($pg in $xml.Project.PropertyGroup) {
+                if ($pg.PlatformToolset) {
+                    $pg.PlatformToolset = $(& "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" -latest -property installationVersion)
+                    # Або скидаємо на стандартний за замовчуванням
+                }
+            }
+            # Простіший підхід через заміну тексту, щоб не ламати структуру XML
+            $content = Get-Content $projFile.FullName -Raw
+            $content = $content -replace '<PlatformToolset>v142</PlatformToolset>', '<PlatformToolset>v143</PlatformToolset>'
+            Set-Content $projFile.FullName -Value $content
         }
 
     - name: Find and Build Solution or Project
