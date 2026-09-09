@@ -14,6 +14,18 @@ jobs:
     - name: Add MSBuild to PATH
       uses: microsoft/setup-msbuild@v2
 
+    - name: Install ATL Component
+      run: |
+        $installer = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vs_installer.exe"
+        $vsPath = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" -latest -property installationPath
+        if ($installer -and $vsPath) {
+            Write-Host "Installing ATL component for VS at: $vsPath"
+            & $installer modify --installPath "$vsPath" --add Microsoft.VisualStudio.Component.VC.ATL --passive --norestart
+        } else {
+            Write-Error "Visual Studio installer not found!"
+            exit 1
+        }
+
     - name: Find and Build Solution or Project
       run: |
         $file = Get-ChildItem -Recurse -Include *.sln, *.vcxproj | Select-Object -First 1
