@@ -14,20 +14,17 @@ jobs:
     - name: Add MSBuild to PATH
       uses: microsoft/setup-msbuild@v2
 
-    - name: Install ATL/MFC Components
+    - name: Install ATL/MFC v142 Components
       run: |
         $installer = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vs_installer.exe"
         $vsPath = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" -latest -property installationPath
         if (Test-Path $installer) {
-            Write-Host "Installing ATL/MFC for Visual Studio at: $vsPath"
-            & $installer modify --installPath "$vsPath" --add Microsoft.VisualStudio.Component.VC.ATLMFC --quiet --norestart --wait
-        } else {
-            Write-Error "VS Installer not found!"
-            exit 1
+            Write-Host "Installing ATL for VS v142 at: $vsPath"
+            & $installer modify --installPath "$vsPath" --add Microsoft.VisualStudio.Component.VC.142.ATLMFC --add Microsoft.VisualStudio.Component.VC.ATLMFC --quiet --norestart --wait
         }
 
     - name: Build kdmapper
-      run: msbuild client/efi-mapper/kdmapper/kdmapper.vcxproj /p:Configuration=Release /p:Platform=x64
+      run: msbuild client/efi-mapper/kdmapper/kdmapper.vcxproj /p:Configuration=Release /p:Platform=x64 /p:PlatformToolset=v143
 
     - name: Upload Artifact
       uses: actions/upload-artifact@v4
