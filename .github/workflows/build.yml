@@ -14,21 +14,14 @@ jobs:
     - name: Add MSBuild to PATH
       uses: microsoft/setup-msbuild@v2
 
-    - name: Install ATL/MFC Components
+    - name: Install ATL and MFC
+      shell: pwsh
       run: |
-        $installer = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vs_installer.exe"
+        $vsInstaller = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vs_installer.exe"
         $vsPath = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" -latest -property installationPath
-        if (Test-Path $installer) {
-            Write-Host "Installing ATL/MFC for VS at: $vsPath"
-            & $installer modify --installPath "$vsPath" --add Microsoft.VisualStudio.Component.VC.ATLMFC --passive --norestart --wait
-        }
-
-    - name: Patch vcxproj to use v143
-      run: |
-        $proj = "client/efi-mapper/kdmapper/kdmapper.vcxproj"
-        $content = Get-Content $proj -Raw
-        $content = $content -replace '<PlatformToolset>v142</PlatformToolset>', '<PlatformToolset>v143</PlatformToolset>'
-        Set-Content $proj -Value $content
+        
+        Write-Host "Installing ATL/MFC components..."
+        & $vsInstaller modify --installPath "$vsPath" --add Microsoft.VisualStudio.Component.VC.ATLMFC --quiet --norestart --wait
 
     - name: Build kdmapper
       run: msbuild client/efi-mapper/kdmapper/kdmapper.vcxproj /p:Configuration=Release /p:Platform=x64
