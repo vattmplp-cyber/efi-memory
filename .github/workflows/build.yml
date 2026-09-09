@@ -14,14 +14,43 @@ jobs:
     - name: Add MSBuild to PATH
       uses: microsoft/setup-msbuild@v2
 
-    - name: Install ATL and MFC
+    - name: Bypass ATL Dependency
       shell: pwsh
       run: |
-        $vsInstaller = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vs_installer.exe"
-        $vsPath = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" -latest -property installationPath
+        $dir = "client/efi-mapper/kdmapper"
         
-        Write-Host "Installing ATL/MFC components..."
-        & $vsInstaller modify --installPath "$vsPath" --add Microsoft.VisualStudio.Component.VC.ATLMFC --quiet --norestart --wait
+        # Створюємо легкий шим замість важкого atlstr.h
+        $shim = @'
+        #pragma once
+        #include <string>
+        #include <windows.h>
+
+        class CString : public std::wstring {
+        public:
+            CString() : std::wstring() {}
+            CString(const wchar_t* s) : std::wstring(s ? s : L"") {}
+            CString(const std::wstring& s) : std::wstring(s) {}
+            CString(const char* s) {
+                if (s) {
+                    int len = MultiByteToWideChar(CP_ACP, 0, s, -1, NULL, 0);
+                    wchar_t* buf = new wchar_t[len];
+                    MultiByteToWideChar(CP_ACP, 0, s, -1, buf, len);
+                    assign(buf);
+                    delete[] buf;
+                }
+            }
+            operator const wchar_t*() const { return c_str(); }
+            bool IsEmpty() const { return empty(); }
+        };
+        '@
+        
+        Set-Content -Path "$dir/atlstr.h" -Value $shim -Encoding UTF8
+        
+        # Змінюємо системний інклуд на локальний у заголовному файлі
+        $hp = "$dir/efi_driver.hpp"
+        $c = Get-Content $hp -Raw
+        $c = $c -replace '#include\s*<atlstr\.h>', '#include "atlstr.h"'
+        Set-Content -Path $hp -Value $c -Encoding UTF8
 
     - name: Build kdmapper
       run: msbuild client/efi-mapper/kdmapper/kdmapper.vcxproj /p:Configuration=Release /p:Platform=x64
