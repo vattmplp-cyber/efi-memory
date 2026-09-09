@@ -14,40 +14,23 @@ jobs:
     - name: Add MSBuild to PATH
       uses: microsoft/setup-msbuild@v2
 
-    - name: Fix Project Configuration for Latest Toolset
+    - name: Install ATL/MFC Components
       run: |
-        $projFile = Get-ChildItem -Recurse -Include *.vcxproj | Select-Object -First 1
-        if ($projFile) {
-            Write-Host "Updating PlatformToolset in: $($projFile.FullName)"
-            [xml]$xml = Get-Content $projFile.FullName
-            # Змінюємо версію інструментів на поточну системну, щоб уникнути конфліктів ATL
-            foreach ($pg in $xml.Project.PropertyGroup) {
-                if ($pg.PlatformToolset) {
-                    $pg.PlatformToolset = $(& "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" -latest -property installationVersion)
-                    # Або скидаємо на стандартний за замовчуванням
-                }
-            }
-            # Простіший підхід через заміну тексту, щоб не ламати структуру XML
-            $content = Get-Content $projFile.FullName -Raw
-            $content = $content -replace '<PlatformToolset>v142</PlatformToolset>', '<PlatformToolset>v143</PlatformToolset>'
-            Set-Content $projFile.FullName -Value $content
-        }
-
-    - name: Find and Build Solution or Project
-      run: |
-        $file = Get-ChildItem -Recurse -Include *.sln, *.vcxproj | Select-Object -First 1
-        if ($file) {
-            Write-Host "Found file: $($file.FullName)"
-            msbuild $file.FullName /p:Configuration=Release /p:Platform=x64
+        $installer = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vs_installer.exe"
+        $vsPath = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" -latest -property installationPath
+        if (Test-Path $installer) {
+            Write-Host "Installing ATL/MFC for Visual Studio at: $vsPath"
+            & $installer modify --installPath "$vsPath" --add Microsoft.VisualStudio.Component.VC.ATLMFC --quiet --norestart --wait
         } else {
-            Write-Error "No .sln or .vcxproj file found in the repository!"
+            Write-Error "VS Installer not found!"
             exit 1
         }
+
+    - name: Build kdmapper
+      run: msbuild client/efi-mapper/kdmapper/kdmapper.vcxproj /p:Configuration=Release /p:Platform=x64
 
     - name: Upload Artifact
       uses: actions/upload-artifact@v4
       with:
         name: client-exe
-        path: |
-          **/Release/*.exe
-          **/x64/Release/*.exe
+        path: client/efi-mapper/kdmapper/x64/Release/*.exe
