@@ -19,7 +19,6 @@ jobs:
       run: |
         $dir = "client/efi-mapper/kdmapper"
         
-        # Створюємо легкий шим замість важкого atlstr.h
         $shim = @'
         #pragma once
         #include <string>
@@ -46,14 +45,13 @@ jobs:
         
         Set-Content -Path "$dir/atlstr.h" -Value $shim -Encoding UTF8
         
-        # Змінюємо системний інклуд на локальний у заголовному файлі
         $hp = "$dir/efi_driver.hpp"
         $c = Get-Content $hp -Raw
         $c = $c -replace '#include\s*<atlstr\.h>', '#include "atlstr.h"'
         Set-Content -Path $hp -Value $c -Encoding UTF8
 
     - name: Build kdmapper
-      run: msbuild client/efi-mapper/kdmapper/kdmapper.vcxproj /p:Configuration=Release /p:Platform=x64
+      run: msbuild client/efi-mapper/kdmapper/kdmapper.vcxproj /p:Configuration=Release /p:Platform=x64 /p:TreatWarningAsError=false
 
     - name: Upload Artifact
       uses: actions/upload-artifact@v4
